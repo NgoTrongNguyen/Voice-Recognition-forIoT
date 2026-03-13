@@ -6,13 +6,13 @@ import torch.nn as nn
 
 # Input Definition
 
-NUM_EPOCHS = 100
+NUM_EPOCHS = 45
 
 data_dir = "Speech\\"
 dataset = SpeechDataset(data_dir)
 dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 num_classes = 5
-some_output_size = 1
+some_output_size = 200
 
 # Model
 model = SpeechCNN()
@@ -41,4 +41,20 @@ for epoch in range(NUM_EPOCHS):
         'optimizer_state_dict': optimizer.state_dict(),
         'loss': avg_loss
     }
-    torch.save(checkpoint, f'checkpoint_epoch_{epoch+1}.pth')
+    if (epoch>148):
+        torch.save(checkpoint, f'checkpoint_epoch_{epoch+1}.pth')
+
+
+test_dataset = SpeechDataset("TestSpeech\\")
+test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+
+correct = 0
+total = 0
+with torch.no_grad():
+    for inputs, labels in test_dataloader:
+        outputs = model(inputs.unsqueeze(1))
+        _, predicted = torch.max(outputs.data, 1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+ 
+print(f'Accuracy: {100 * correct / total}%')

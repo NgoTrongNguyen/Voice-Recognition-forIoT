@@ -3,13 +3,12 @@ from Data import SpeechDataset
 from torch.utils.data import DataLoader
 import torch
 import torch.nn as nn
-from Train import SpeechCNN
 
 model = SpeechCNN()
 
-test_dataset = SpeechDataset('your_test_data_directory')
+test_dataset = SpeechDataset("TestSpeech\\")
 test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
- 
+
 correct = 0
 total = 0
 with torch.no_grad():
