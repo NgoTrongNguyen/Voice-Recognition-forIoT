@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Điều Khiển Xe Bằng Giọng Nói</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body
+    class="bg-gray-900 text-white h-screen flex items-center justify-center font-sans"
+  >
+    <div
+      class="bg-gray-800 p-10 rounded-2xl shadow-2xl w-full max-w-md text-center border border-gray-700"
+    >
+      <h1 class="text-3xl font-bold mb-2 tracking-wide text-blue-400">
+        <i class="fa-solid fa-car-side mr-2"></i>IoT Vehicle
+      </h1>
+      <p class="text-gray-400 mb-8 text-sm">
+        Hệ thống điều khiển bằng giọng nói
+      </p>
+
+      <div
+        id="upload-box"
+        class="border-2 border-dashed border-gray-600 rounded-xl p-8 mb-6 hover:border-blue-500 hover:bg-gray-700 transition-all cursor-pointer relative"
+      >
+        <input
+          type="file"
+          id="audio-upload"
+          accept="audio/*"
+          class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        />
+        <i
+          class="fa-solid fa-cloud-arrow-up text-4xl text-gray-400 mb-3 block"
+        ></i>
+        <span class="text-gray-300 font-medium"
+          >Click hoặc Kéo thả file âm thanh</span
+        >
+        <p class="text-xs text-gray-500 mt-2">Hỗ trợ: .wav, .mp3, .m4a</p>
+      </div>
+
+      <div id="loading" class="hidden mb-6">
+        <i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-500"></i>
+        <p class="text-gray-400 mt-2 text-sm animate-pulse">
+          Đang phân tích AI...
+        </p>
+      </div>
+
+      <div
+        id="result-box"
+        class="hidden bg-gray-900 rounded-xl p-6 border border-gray-700"
+      >
+        <p class="text-gray-400 text-xs uppercase tracking-wider mb-1">
+          Bạn đã nói
+        </p>
+        <p
+          id="recognized-text"
+          class="text-lg font-medium text-white mb-4 italic"
+        >
+          "..."
+        </p>
+
+        <p class="text-gray-400 text-xs uppercase tracking-wider mb-1">
+          Mã lệnh cho xe
+        </p>
+        <p
+          id="vehicle-command"
+          class="text-2xl font-bold text-green-400 tracking-widest"
+        >
+          _
+        </p>
+      </div>
+
+      <div
+        id="error-box"
+        class="hidden bg-red-900/30 border border-red-500 rounded-xl p-4 mt-4 text-red-400 text-sm"
+      ></div>
+    </div>
+
+    <script>
+      const uploadInput = document.getElementById("audio-upload");
+      const uploadBox = document.getElementById("upload-box");
+      const loading = document.getElementById("loading");
+      const resultBox = document.getElementById("result-box");
+      const errorBox = document.getElementById("error-box");
+      const recText = document.getElementById("recognized-text");
+      const cmdText = document.getElementById("vehicle-command");
+
+      uploadInput.addEventListener("change", async function () {
+        if (this.files.length === 0) return;
+
+        const file = this.files[0];
+        const formData = new FormData();
+        formData.append("audio_file", file);
+
+        // Giao diện: Tắt upload, bật loading
+        uploadBox.classList.add("hidden");
+        resultBox.classList.add("hidden");
+        errorBox.classList.add("hidden");
+        loading.classList.remove("hidden");
+
+        try {
+          // Gọi tới FastAPI Backend của bạn
+          const response = await fetch("http://localhost:8000/api/v1/command", {
+            method: "POST",
+            body: formData,
+          });
+
+          const data = await response.json();
+
+          if (data.status === "success") {
+            recText.innerText = `"${data.recognized_text}"`;
+            cmdText.innerText = data.vehicle_command;
+            resultBox.classList.remove("hidden");
+          } else {
+            showError(data.message);
+          }
+        } catch (err) {
+          showError(
+            "Không thể kết nối tới Server. Hãy chắc chắn Uvicorn đang chạy ở port 8000.",
+          );
+        } finally {
+          loading.classList.add("hidden");
+          uploadBox.classList.remove("hidden");
+          this.value = ""; // Reset input
+        }
+      });
+
+      function showError(msg) {
+        errorBox.innerText = msg;
+        errorBox.classList.remove("hidden");
+      }
+    </script>
+  </body>
+</html>
