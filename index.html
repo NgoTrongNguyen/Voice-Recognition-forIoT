@@ -3,12 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Điều Khiển Xe Bằng Giọng Nói</title>
+    <title>Sonni AIoT Car</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
       rel="stylesheet"
     />
+    <style>
+      .recording-pulse {
+        animation: pulse-red 1.5s infinite;
+      }
+      @keyframes pulse-red {
+        0% {
+          box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+        }
+        70% {
+          box-shadow: 0 0 0 20px rgba(239, 68, 68, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+        }
+      }
+    </style>
   </head>
   <body
     class="bg-gray-900 text-white h-screen flex items-center justify-center font-sans"
@@ -17,35 +33,26 @@
       class="bg-gray-800 p-10 rounded-2xl shadow-2xl w-full max-w-md text-center border border-gray-700"
     >
       <h1 class="text-3xl font-bold mb-2 tracking-wide text-blue-400">
-        <i class="fa-solid fa-car-side mr-2"></i>IoT Vehicle
+        <i class="fa-solid fa-car-side mr-2"></i>Sonni AIoT Car
       </h1>
-      <p class="text-gray-400 mb-8 text-sm">
-        Hệ thống điều khiển bằng giọng nói
-      </p>
+      <p class="text-gray-400 mb-8 text-sm">Giữ để nói, buông để gửi lệnh</p>
 
-      <div
-        id="upload-box"
-        class="border-2 border-dashed border-gray-600 rounded-xl p-8 mb-6 hover:border-blue-500 hover:bg-gray-700 transition-all cursor-pointer relative"
-      >
-        <input
-          type="file"
-          id="audio-upload"
-          accept="audio/*"
-          class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-        />
-        <i
-          class="fa-solid fa-cloud-arrow-up text-4xl text-gray-400 mb-3 block"
-        ></i>
-        <span class="text-gray-300 font-medium"
-          >Click hoặc Kéo thả file âm thanh</span
+      <div class="flex justify-center mb-8">
+        <button
+          id="record-btn"
+          class="w-32 h-32 bg-blue-600 rounded-full flex items-center justify-center text-5xl hover:bg-blue-500 transition-all duration-300 focus:outline-none shadow-lg"
         >
-        <p class="text-xs text-gray-500 mt-2">Hỗ trợ: .wav, .mp3, .m4a</p>
+          <i id="mic-icon" class="fa-solid fa-microphone text-white"></i>
+        </button>
       </div>
+      <p id="record-status" class="text-gray-400 text-sm font-medium mb-4">
+        Nhấn và giữ nút để bắt đầu
+      </p>
 
       <div id="loading" class="hidden mb-6">
         <i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-500"></i>
         <p class="text-gray-400 mt-2 text-sm animate-pulse">
-          Đang phân tích AI...
+          Đang gửi lên xe...
         </p>
       </div>
 
@@ -73,38 +80,86 @@
           _
         </p>
       </div>
-
-      <div
-        id="error-box"
-        class="hidden bg-red-900/30 border border-red-500 rounded-xl p-4 mt-4 text-red-400 text-sm"
-      ></div>
     </div>
 
     <script>
-      const uploadInput = document.getElementById("audio-upload");
-      const uploadBox = document.getElementById("upload-box");
+      const recordBtn = document.getElementById("record-btn");
+      const micIcon = document.getElementById("mic-icon");
+      const recordStatus = document.getElementById("record-status");
       const loading = document.getElementById("loading");
       const resultBox = document.getElementById("result-box");
-      const errorBox = document.getElementById("error-box");
       const recText = document.getElementById("recognized-text");
       const cmdText = document.getElementById("vehicle-command");
 
-      uploadInput.addEventListener("change", async function () {
-        if (this.files.length === 0) return;
+      let mediaRecorder;
+      let audioChunks = [];
 
-        const file = this.files[0];
+      navigator.mediaDevices
+        .getUserMedia({ audio: true })
+        .then((stream) => {
+          mediaRecorder = new MediaRecorder(stream);
+
+          mediaRecorder.addEventListener("dataavailable", (event) => {
+            audioChunks.push(event.data);
+          });
+
+          mediaRecorder.addEventListener("stop", async () => {
+            const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+            audioChunks = [];
+            await sendAudioToServer(audioBlob);
+          });
+        })
+        .catch((err) => {
+          recordBtn.classList.add("opacity-50", "cursor-not-allowed");
+        });
+
+      const startRecording = () => {
+        if (mediaRecorder && mediaRecorder.state === "inactive") {
+          mediaRecorder.start();
+          recordBtn.classList.remove("bg-blue-600", "hover:bg-blue-500");
+          recordBtn.classList.add("bg-red-500", "recording-pulse");
+          micIcon.classList.remove("fa-microphone");
+          micIcon.classList.add("fa-microphone-lines");
+          recordStatus.innerText = "Đang thu âm... (Buông ra để gửi)";
+          recordStatus.classList.add("text-red-400");
+          resultBox.classList.add("hidden");
+        }
+      };
+
+      const stopRecording = () => {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+          mediaRecorder.stop();
+          recordBtn.classList.remove("bg-red-500", "recording-pulse");
+          recordBtn.classList.add("bg-blue-600", "hover:bg-blue-500");
+          micIcon.classList.remove("fa-microphone-lines");
+          micIcon.classList.add("fa-microphone");
+          recordStatus.innerText = "Đang xử lý...";
+          recordStatus.classList.remove("text-red-400");
+        }
+      };
+
+      recordBtn.addEventListener("mousedown", startRecording);
+      recordBtn.addEventListener("mouseup", stopRecording);
+      recordBtn.addEventListener("mouseleave", stopRecording);
+
+      recordBtn.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        startRecording();
+      });
+      recordBtn.addEventListener("touchend", (e) => {
+        e.preventDefault();
+        stopRecording();
+      });
+
+      async function sendAudioToServer(audioBlob) {
         const formData = new FormData();
-        formData.append("audio_file", file);
+        formData.append("audio_file", audioBlob, "record.webm");
 
-        // Giao diện: Tắt upload, bật loading
-        uploadBox.classList.add("hidden");
-        resultBox.classList.add("hidden");
-        errorBox.classList.add("hidden");
         loading.classList.remove("hidden");
+        recordStatus.classList.add("hidden");
 
         try {
-          // Gọi tới FastAPI Backend của bạn
-          const response = await fetch("http://localhost:8000/api/v1/command", {
+          const response = await fetch("/api/v1/command", {
             method: "POST",
             body: formData,
           });
@@ -116,22 +171,16 @@
             cmdText.innerText = data.vehicle_command;
             resultBox.classList.remove("hidden");
           } else {
-            showError(data.message);
+            resultBox.classList.add("hidden");
+            console.log(data.message);
           }
         } catch (err) {
-          showError(
-            "Không thể kết nối tới Server. Hãy chắc chắn Uvicorn đang chạy ở port 8000.",
-          );
+          resultBox.classList.add("hidden");
         } finally {
           loading.classList.add("hidden");
-          uploadBox.classList.remove("hidden");
-          this.value = ""; // Reset input
+          recordStatus.classList.remove("hidden");
+          recordStatus.innerText = "Nhấn và giữ nút để bắt đầu";
         }
-      });
-
-      function showError(msg) {
-        errorBox.innerText = msg;
-        errorBox.classList.remove("hidden");
       }
     </script>
   </body>
